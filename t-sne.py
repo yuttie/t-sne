@@ -40,7 +40,7 @@ plt.colorbar()
 # ## My Own Implementation
 
 # +
-from typing import Any, Dict, Type
+from typing import Any, Dict, Optional, Type
 
 import numpy as np
 import torch
@@ -52,12 +52,16 @@ class MyTSNE(nn.Module):
     def __init__(self,
             d: torch.Tensor,
             n_components: int,
-            perplexity: float):
+            perplexity: float,
+            random_state: Optional[int]=None):
         super().__init__()
 
         assert d.shape[0] == d.shape[1]
         self.n = d.shape[0]
-        self.embedding = nn.Embedding(num_embeddings=self.n, embedding_dim=n_components)
+        
+        if random_state is not None:
+            torch.seed(random_state)
+        self.embeddings = nn.Parameter(torch.normal(0, 1e-4, (self.n, n_components)))
 
         # sigma
         sigma = MyTSNE.find_sigma(d, perplexity)
@@ -134,7 +138,7 @@ class MyTSNE(nn.Module):
     def forward(self):
         device = next(self.parameters()).device
         # q
-        ys = self.embedding(torch.arange(self.n, device=device))
+        ys = self.embeddings
         d_low = torch.cdist(ys, ys)
         r = (1 + d_low ** 2) ** -1
         del d_low
@@ -147,10 +151,6 @@ class MyTSNE(nn.Module):
         C = c.sum()
         return C
 
-    def embeddings(self):
-        device = next(self.parameters()).device
-        return self.embedding(torch.arange(self.n, device=device))
-
 def embed(
         d: np.ndarray,
         n_components: int=2,
@@ -159,10 +159,11 @@ def embed(
         optimizer_class: Type[optim.Optimizer]=optim.Adam,
         optimizer_kwargs: Dict[str, Any]={ 'lr': 1. },
         n_iter: int=1000,
+        random_state: Optional[int]=None,
         device: torch.device=torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')) -> np.ndarray:
     d = d / d.max()
     d = torch.from_numpy(d)
-    net = MyTSNE(d, n_components, perplexity).to(device=device, dtype=torch.float32)
+    net = MyTSNE(d, n_components, perplexity, random_state).to(device=device, dtype=torch.float32)
     optimizer = optimizer_class(net.parameters(), **optimizer_kwargs)
     from tqdm import tqdm
     for epoch in tqdm(range(n_iter)):
@@ -170,7 +171,7 @@ def embed(
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-    return net.embeddings().cpu().detach().numpy()
+    return net.embeddings.cpu().detach().numpy()
 
 X_embedded = embed(dist_matrix, n_components=2)
 
