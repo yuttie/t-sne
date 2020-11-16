@@ -59,6 +59,11 @@ class MyTSNE(nn.Module):
         assert d.shape[0] == d.shape[1]
         self.n = d.shape[0]
 
+        # Perplexity must be less than N - 1 because \lim_{\sigma \to +\infty} Perp(P_i) = N - 1
+        if perplexity >= self.n - 1:
+            raise ValueError('Perplexity must be less than N - 1')
+        self.perplexity = perplexity
+
         if random_state is not None:
             torch.manual_seed(random_state)
         self.embeddings = nn.Parameter(torch.normal(0, 1e-4, (self.n, n_components)))
