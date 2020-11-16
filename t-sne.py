@@ -60,7 +60,7 @@ class MyTSNE(nn.Module):
         self.n = d.shape[0]
 
         if random_state is not None:
-            torch.seed(random_state)
+            torch.manual_seed(random_state)
         self.embeddings = nn.Parameter(torch.normal(0, 1e-4, (self.n, n_components)))
 
         # sigma
@@ -173,7 +173,7 @@ def embed(
         optimizer.step()
     return net.embeddings.cpu().detach().numpy()
 
-X_embedded = embed(dist_matrix, n_components=2)
+X_embedded = embed(dist_matrix, n_components=2, random_state=42)
 
 import matplotlib.pyplot as plt
 plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=digits.target)
