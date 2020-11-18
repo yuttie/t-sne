@@ -79,15 +79,21 @@ class MyTSNE(nn.Module):
         p = (p_cond + p_cond.transpose(0, 1)) / (2 * self.n)
         self.register_buffer('p', p)
 
-    def compute_perp_i(d_i, sigma_i):
-        # p_i
-        r_i = torch.exp(-d_i ** 2 / (2 * sigma_i ** 2))
-        p_i = r_i / (r_i.sum() - 1)
-        p_i[i] = 1
-        # H(p_i)
-        h_p_i = -(p_i * torch.log2(p_i)).sum()
-        perp_i = 2 ** h_p_i
-        return perp_i
+    def forward(self):
+        device = next(self.parameters()).device
+        # q
+        ys = self.embeddings
+        d_low = torch.cdist(ys, ys)
+        r = (1 + d_low ** 2) ** -1
+        del d_low
+        q = r / (r.sum() - self.n)  # q[i, j] is q_{ij}
+        del r
+        # KL divergence
+        p = self.p
+        c = p * (torch.log(p) - torch.log(q))
+        c.fill_diagonal_(0)
+        C = c.sum()
+        return C
 
     def find_sigma(d, target_perp):
         assert d.shape[0] == d.shape[1]
@@ -140,21 +146,15 @@ class MyTSNE(nn.Module):
                     break
         return sigma
 
-    def forward(self):
-        device = next(self.parameters()).device
-        # q
-        ys = self.embeddings
-        d_low = torch.cdist(ys, ys)
-        r = (1 + d_low ** 2) ** -1
-        del d_low
-        q = r / (r.sum() - self.n)  # q[i, j] is q_{ij}
-        del r
-        # KL divergence
-        p = self.p
-        c = p * (torch.log(p) - torch.log(q))
-        c.fill_diagonal_(0)
-        C = c.sum()
-        return C
+    def compute_perp_i(d_i, sigma_i):
+        # p_i
+        r_i = torch.exp(-d_i ** 2 / (2 * sigma_i ** 2))
+        p_i = r_i / (r_i.sum() - 1)
+        p_i[i] = 1
+        # H(p_i)
+        h_p_i = -(p_i * torch.log2(p_i)).sum()
+        perp_i = 2 ** h_p_i
+        return perp_i
 
 def embed(
         d: np.ndarray,
