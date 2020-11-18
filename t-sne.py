@@ -96,10 +96,10 @@ class MyTSNE(nn.Module):
         return C
 
     def find_sigma(d, target_perp):
+        """Find an optimal sigma for each i by using binary search"""
         assert d.shape[0] == d.shape[1]
         n = d.shape[0]
 
-        # Find an optimal sigma for each i
         from tqdm import tqdm
         sigma = torch.zeros(n)
         for i in tqdm(range(n)):
@@ -110,12 +110,14 @@ class MyTSNE(nn.Module):
         return sigma
 
     def compute_perp_i(i, d_i, sigma_i):
+        """Compute the perplexity for the i-th point with a given sigma"""
         # p_i
         r_i = torch.exp(-d_i ** 2 / (2 * sigma_i ** 2))
         p_i = r_i / (r_i.sum() - 1)
         p_i[i] = 1
         # H(p_i)
         h_p_i = -(p_i * torch.log2(p_i)).sum()
+        # Perp_i
         perp_i = 2 ** h_p_i
         return perp_i
 
@@ -151,6 +153,7 @@ class MyTSNE(nn.Module):
         return lb, ub
 
     def binary_search(f, lb, ub):
+        """Find the solution of f(x) = 0 with in [lb, ub]"""
         while True:
             x = (lb + ub) / 2
 
