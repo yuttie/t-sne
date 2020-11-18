@@ -103,47 +103,10 @@ class MyTSNE(nn.Module):
         from tqdm import tqdm
         sigma = torch.zeros(n)
         for i in tqdm(range(n)):
-            sigma_i = 1
-            perp_i = MyTSNE.compute_perp_i(i, d[i, :], sigma_i)
-            if perp_i > target_perp:
-                # Current sigma_i is too large
-                sigma_i_upper = sigma_i
-                # Find a sigma_i that makes perp_i < target_perp
-                while perp_i >= target_perp:
-                    sigma_i /= 2
-                    perp_i = MyTSNE.compute_perp_i(i, d[i, :], sigma_i)
-                # Current sigma_i is too small
-                sigma_i_lower = sigma_i
-            elif perp_i < target_perp:
-                # Current sigma_i is too small
-                sigma_i_lower = sigma_i
-                # Find a sigma_i that makes perp_i > target_perp
-                while perp_i <= target_perp:
-                    sigma_i *= 2
-                    perp_i = MyTSNE.compute_perp_i(i, d[i, :], sigma_i)
-                # Current sigma_i is too small
-                sigma_i_upper = sigma_i
-            else:
-                # perp_i == target_perp
-                sigma[i] = sigma_i
-                continue
-            # Perform binary search
-            while True:
-                sigma_i = (sigma_i_upper + sigma_i_lower) / 2
-                if sigma_i == sigma_i_upper or sigma_i == sigma_i_lower:
-                    sigma[i] = sigma_i
-                    break
-                perp_i = MyTSNE.compute_perp_i(i, d[i, :], sigma_i)
-                if perp_i > target_perp:
-                    # Current sigma_i is too large
-                    sigma_i_upper = sigma_i
-                elif perp_i < target_perp:
-                    # Current sigma_i is too small
-                    sigma_i_lower = sigma_i
-                else:
-                    # perp_i == target_perp
-                    sigma[i] = sigma_i
-                    break
+            def f(x):
+                return MyTSNE.compute_perp_i(i, d[i, :], x) - target_perp
+            lb, ub = MyTSNE.find_initial_bounds(f)
+            sigma[i] = MyTSNE.binary_search(f, lb, ub)
         return sigma
 
     def compute_perp_i(i, d_i, sigma_i):
@@ -155,6 +118,56 @@ class MyTSNE(nn.Module):
         h_p_i = -(p_i * torch.log2(p_i)).sum()
         perp_i = 2 ** h_p_i
         return perp_i
+
+    def find_initial_bounds(f):
+        """Find lower and upper bounds for the solution of f(x) = 0
+
+        Assumptions:
+        - x > 0
+        - `f` is monotonically increasing
+        """
+        x = 1
+        y = f(x)
+        if y > 0:
+            # Current x is too large
+            ub = x
+            # Find a lower bound that makes y < 0
+            while y >= 0:
+                x /= 2
+                y = f(x)
+            lb = x
+        elif y < 0:
+            # Current x is too small
+            lb = x
+            # Find a upper bound that makes y > 0
+            while y <= 0:
+                x *= 2
+                y = f(x)
+            ub = x
+        else:
+            # y == 0
+            ub = x
+            lb = x
+        return lb, ub
+
+    def binary_search(f, lb, ub):
+        while True:
+            x = (lb + ub) / 2
+
+            if x == lb or x == ub:
+                # Reached the precision limit
+                return x
+
+            y = f(x)
+            if y > 0:
+                # Current x is too large
+                ub = x
+            elif y < 0:
+                # Current x is too small
+                lb = x
+            else:
+                # Found the solution
+                return x
 
 def embed(
         d: np.ndarray,
