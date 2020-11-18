@@ -104,14 +104,14 @@ class MyTSNE(nn.Module):
         sigma = torch.zeros(n)
         for i in tqdm(range(n)):
             sigma_i = 1
-            perp_i = MyTSNE.compute_perp_i(d[i, :], sigma_i)
+            perp_i = MyTSNE.compute_perp_i(i, d[i, :], sigma_i)
             if perp_i > target_perp:
                 # Current sigma_i is too large
                 sigma_i_upper = sigma_i
                 # Find a sigma_i that makes perp_i < target_perp
                 while perp_i >= target_perp:
                     sigma_i /= 2
-                    perp_i = MyTSNE.compute_perp_i(d[i, :], sigma_i)
+                    perp_i = MyTSNE.compute_perp_i(i, d[i, :], sigma_i)
                 # Current sigma_i is too small
                 sigma_i_lower = sigma_i
             elif perp_i < target_perp:
@@ -120,7 +120,7 @@ class MyTSNE(nn.Module):
                 # Find a sigma_i that makes perp_i > target_perp
                 while perp_i <= target_perp:
                     sigma_i *= 2
-                    perp_i = MyTSNE.compute_perp_i(d[i, :], sigma_i)
+                    perp_i = MyTSNE.compute_perp_i(i, d[i, :], sigma_i)
                 # Current sigma_i is too small
                 sigma_i_upper = sigma_i
             else:
@@ -133,7 +133,7 @@ class MyTSNE(nn.Module):
                 if sigma_i == sigma_i_upper or sigma_i == sigma_i_lower:
                     sigma[i] = sigma_i
                     break
-                perp_i = MyTSNE.compute_perp_i(d[i, :], sigma_i)
+                perp_i = MyTSNE.compute_perp_i(i, d[i, :], sigma_i)
                 if perp_i > target_perp:
                     # Current sigma_i is too large
                     sigma_i_upper = sigma_i
@@ -146,7 +146,7 @@ class MyTSNE(nn.Module):
                     break
         return sigma
 
-    def compute_perp_i(d_i, sigma_i):
+    def compute_perp_i(i, d_i, sigma_i):
         # p_i
         r_i = torch.exp(-d_i ** 2 / (2 * sigma_i ** 2))
         p_i = r_i / (r_i.sum() - 1)
