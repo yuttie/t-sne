@@ -188,8 +188,8 @@ def embed(
     optimizer = optimizer_class(net.parameters(), **optimizer_kwargs)
     from tqdm import tqdm
     for epoch in tqdm(range(n_iter)):
-        loss = net()
         optimizer.zero_grad()
+        loss = net()
         loss.backward()
         optimizer.step()
     return net.embeddings.cpu().detach().numpy()
